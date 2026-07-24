@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Steel Load — Energy Intelligence</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<div class="app">
+
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark">SL</span>
+      <div class="brand-text">
+        <span class="brand-name">Steel&nbsp;Load</span>
+        <span class="brand-sub">Energy Intelligence · Random Forest</span>
+      </div>
+    </div>
+
+    <nav class="tabs" role="tablist">
+      <button class="tab active" data-view="dashboard" role="tab" aria-selected="true">Dashboard</button>
+      <button class="tab" data-view="predict" role="tab" aria-selected="false">Predict</button>
+    </nav>
+
+    <div class="status" id="apiStatus">
+      <span class="dot" id="apiDot"></span>
+      <span id="apiStatusText">Checking API…</span>
+    </div>
+  </header>
+
+  <main>
+
+    <!-- ===================== DASHBOARD VIEW ===================== -->
+    <section id="dashboard-view" class="view">
+
+      <div class="view-head">
+        <div>
+          <h1>Plant Load Overview</h1>
+          <p class="muted">Batch predictions on a set of shift readings — same shape of analysis as the notebook, live from the model.</p>
+        </div>
+        <div class="view-actions">
+          <label class="btn ghost" for="csvInput">Upload CSV
+            <input type="file" id="csvInput" accept=".csv" hidden />
+          </label>
+          <button class="btn primary" id="genSampleBtn">Generate sample batch</button>
+        </div>
+      </div>
+
+      <div class="metric-row" id="metricRow">
+        <div class="metric-card"><span class="metric-label">Records</span><span class="metric-value" id="mRecords">—</span></div>
+        <div class="metric-card"><span class="metric-label">Avg. predicted usage</span><span class="metric-value" id="mAvg">—</span><span class="metric-unit">kWh</span></div>
+        <div class="metric-card"><span class="metric-label">Peak</span><span class="metric-value" id="mMax">—</span><span class="metric-unit">kWh</span></div>
+        <div class="metric-card"><span class="metric-label">Lowest</span><span class="metric-value" id="mMin">—</span><span class="metric-unit">kWh</span></div>
+        <div class="metric-card"><span class="metric-label">Std. deviation</span><span class="metric-value" id="mStd">—</span><span class="metric-unit">kWh</span></div>
+      </div>
+
+      <div class="grid">
+        <div class="panel span-8">
+          <h2>Predicted usage by record</h2>
+          <canvas id="chartSeries" height="90"></canvas>
+        </div>
+        <div class="panel span-4">
+          <h2>Load type mix</h2>
+          <canvas id="chartLoadType" height="90"></canvas>
+        </div>
+        <div class="panel span-6">
+          <h2>Feature importance</h2>
+          <canvas id="chartImportance" height="110"></canvas>
+        </div>
+        <div class="panel span-6">
+          <h2>Prediction distribution</h2>
+          <canvas id="chartDist" height="110"></canvas>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head-row">
+          <h2>Records</h2>
+          <span class="muted small" id="tableNote"></span>
+        </div>
+        <div class="table-wrap">
+          <table id="resultsTable">
+            <thead><tr id="tableHead"></tr></thead>
+            <tbody id="tableBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <p class="empty-state" id="dashboardEmpty">No data yet — generate a sample batch or upload a CSV of shift readings to see the dashboard.</p>
+
+    </section>
+
+    <!-- ===================== PREDICT VIEW ===================== -->
+    <section id="predict-view" class="view" hidden>
+
+      <div class="view-head">
+        <div>
+          <h1>Predict a Single Reading</h1>
+          <p class="muted">Enter the electrical readings for one 15-minute interval and get the model's predicted usage.</p>
+        </div>
+      </div>
+
+      <div class="predict-layout">
+
+        <form class="panel form-panel" id="predictForm">
+
+          <div class="field">
+            <label for="f_lag">Lagging current reactive power</label>
+            <div class="field-row">
+              <input type="range" id="f_lag_range" />
+              <input type="number" id="f_lag" step="0.01" />
+              <span class="unit">kVarh</span>
+            </div>
+          </div>
+
+          <div class="field">
+            <label for="f_lead">Leading current reactive power</label>
+            <div class="field-row">
+              <input type="range" id="f_lead_range" />
+              <input type="number" id="f_lead" step="0.01" />
+              <span class="unit">kVarh</span>
+            </div>
+          </div>
+
+          <div class="field">
+            <label for="f_co2">CO₂ emissions</label>
+            <div class="field-row">
+              <input type="range" id="f_co2_range" />
+              <input type="number" id="f_co2" step="0.001" />
+              <span class="unit">tCO2</span>
+            </div>
+          </div>
+
+          <div class="field">
+            <label for="f_lagpf">Lagging current power factor</label>
+            <div class="field-row">
+              <input type="range" id="f_lagpf_range" />
+              <input type="number" id="f_lagpf" step="0.01" />
+              <span class="unit">%</span>
+            </div>
+          </div>
+
+          <div class="field">
+            <label for="f_leadpf">Leading current power factor</label>
+            <div class="field-row">
+              <input type="range" id="f_leadpf_range" />
+              <input type="number" id="f_leadpf" step="0.01" />
+              <span class="unit">%</span>
+            </div>
+          </div>
+
+          <div class="field">
+            <label for="f_nsm">Time of day (NSM)</label>
+            <div class="field-row">
+              <input type="range" id="f_nsm_range" />
+              <input type="number" id="f_nsm" step="1" />
+              <span class="unit" id="f_nsm_clock">00:00</span>
+            </div>
+          </div>
+
+          <div class="field-pair">
+            <div class="field">
+              <label for="f_loadtype">Load type</label>
+              <select id="f_loadtype"></select>
+            </div>
+            <div class="field">
+              <label for="f_day">Day of week</label>
+              <select id="f_day"></select>
+            </div>
+          </div>
+
+          <button type="submit" class="btn primary full" id="predictBtn">Run prediction</button>
+        </form>
+
+        <div class="panel result-panel">
+          <h2>Predicted usage</h2>
+          <div class="gauge-wrap">
+            <svg viewBox="0 0 220 130" class="gauge">
+              <path id="gaugeTrack" class="gauge-track" d="" />
+              <path id="gaugeFill" class="gauge-fill" d="" />
+            </svg>
+            <div class="gauge-readout">
+              <span class="gauge-value" id="predValue">—</span>
+              <span class="gauge-unit">kWh</span>
+            </div>
+          </div>
+          <p class="muted small" id="predContext">Fill in the readings and run a prediction to see the result.</p>
+
+          <div class="mini-importance">
+            <h3>What drives this prediction</h3>
+            <div id="miniImportanceList"></div>
+          </div>
+        </div>
+
+      </div>
+
+    </section>
+
+  </main>
+
+  <footer>
+    <span>Steel Load · local Random Forest model served from Flask</span>
+    <span id="apiUrlLabel"></span>
+  </footer>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
